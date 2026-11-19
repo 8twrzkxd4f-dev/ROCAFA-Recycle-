@@ -1,0 +1,22 @@
+# macOS 與編輯器暫存
+.DS_Store
+._*
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python 快取與本機虛擬環境
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node.js 本機相依套件
+node_modules/
+
+# 本機環境設定與憑證
+.env
+.env.*
+!.env.example

@@ -1,0 +1,129 @@
+<section id="vv-dynamic" class="vv-section">
+ <h2>1／2 · 充氣、雙階段下降與 6DOF 研究模型</h2>
+ <p class="note">從最高點開始；阻力面積依指定充氣時間平滑成長。預設充氣時間與慣量均為研究假設，未經標定。1D 不含側風；6DOF 為單剛體平移與轉動，非雙剛體 9DOF。</p>
+ <div class="vv-form" id="vv-inputs">
+  <label>模型<select id="vv-mode"><option value="1d">1D 雙傘垂直下降</option><option value="6dof">6DOF 單剛體近似</option></select></label>
+  <label>回收質量 kg<input id="vv-mass" type="number" value="19.471" step="0.001" min="1" max="200"></label>
+  <label>最高點高度 m AGL<input id="vv-height" type="number" value="3361" min="1" max="5000"></label>
+  <label>主傘觸發高度 m AGL<input id="vv-main_height" type="number" value="450" min="0" max="5000"></label>
+  <label>主傘名目面積 m²<input id="vv-main_area" type="number" value="6.05" step="0.01" min="0.1" max="30"></label>
+  <label>導引傘名目面積 m²<input id="vv-drogue_area" type="number" value="2.12" step="0.01" min="0.05" max="10"></label>
+  <label>主傘 Cd<input id="vv-main_cd" type="number" value="0.8" step="0.01" min="0.1" max="3"></label>
+  <label>導引傘 Cd<input id="vv-drogue_cd" type="number" value="0.75" step="0.01" min="0.1" max="3"></label>
+  <label>主傘初段充氣時間 s<input id="vv-main_fill" type="number" value="1" step="0.1" min="0.1" max="15"></label>
+  <label>導引傘充氣時間 s<input id="vv-drogue_fill" type="number" value="1" step="0.1" min="0.1" max="15"></label>
+ </div>
+ <details><summary>展開時序、側風、慣量與數值設定</summary><div class="vv-form" id="vv-advanced">
+  <label>最高點後導引傘延遲 s<input id="vv-drogue_delay" type="number" value="0.5" step="0.1" min="0" max="20"></label>
+  <label>起始下降速度 m/s<input id="vv-initial_speed" type="number" value="0" step="0.1" min="0" max="60"></label>
+  <label>初段阻力面積比例（1＝不收口）<input id="vv-reef_ratio" type="number" value="1" step="0.05" min="0.05" max="1"></label>
+  <label>初段充氣完成後維持時間 s<input id="vv-reef_hold" type="number" value="1" step="0.1" min="0" max="30"></label>
+  <label>解除收口後充氣時間 s<input id="vv-release_fill" type="number" value="1" step="0.1" min="0.1" max="15"></label>
+  <label>主傘觸發後導引傘<select id="vv-retain"><option value="false">阻力停用（理想切換）</option><option value="true">保留阻力（忽略傘間干擾）</option></select></label>
+  <label>地面密度 kg/m³<input id="vv-rho0" type="number" value="1.225" step="0.001" min="0.5" max="1.5"></label>
+  <label>東向風 m/s（6DOF）<input id="vv-wind_x" type="number" value="0" min="-20" max="20"></label>
+  <label>北向風 m/s（6DOF）<input id="vv-wind_y" type="number" value="0" min="-20" max="20"></label>
+  <label>初始傾角 °（6DOF）<input id="vv-tilt_deg" type="number" value="5" min="0" max="60"></label>
+  <label>橫向慣量 kg·m²（6DOF）<input id="vv-inertia_xy" type="number" value="16" step="0.1" min="1" max="500"></label>
+  <label>軸向慣量 kg·m²（6DOF）<input id="vv-inertia_z" type="number" value="0.06" step="0.01" min="0.01" max="20"></label>
+  <label>氣動作用點至質心 m（6DOF）<input id="vv-lever" type="number" value="0.4" step="0.1" min="0" max="3"></label>
+  <label>旋轉阻尼 N·m·s（6DOF）<input id="vv-damping" type="number" value="2" step="0.1" min="0" max="20"></label>
+  <label>時間步長 s<input id="vv-dt" type="number" value="0.04" step="0.005" min="0.005" max="0.1"></label>
+  <label>最長模擬時間 s<input id="vv-max_time" type="number" value="600" min="10" max="1000"></label>
+ </div></details>
+ <div class="viz-controls"><button id="vv-sync" type="button">載入上方雙傘裁片面積</button><button id="vv-run" type="button">執行動態模擬</button><button id="vv-converge" type="button">檢查 Δt、Δt/2、Δt/4</button><button id="vv-export" type="button" disabled>匯出本次歷程 CSV</button></div>
+ <p id="vv-status" role="status">尚未執行。</p><div id="vv-error" role="alert" class="text-destructive"></div>
+ <div id="vv-summary" class="vv-metrics"></div>
+ <label>曲線範圍<select id="vv-focus"><option value="all">全程</option><option value="main">主傘觸發前後 10 秒</option><option value="drogue">導引傘前 10 秒</option></select></label>
+ <div class="vv-plots"><div id="vv-force"></div><div id="vv-speed"></div><div id="vv-heightplot"></div><div id="vv-attitude"></div></div>
+ <details id="vv-conv-details"><summary>時間步長敏感度結果</summary><div id="vv-conv"></div></details>
+ <p class="note">圖表為降採樣歷程；峰值以每個積分步取樣。氣動合力 ≠ 傘繩拉直衝擊；此模型不計 added mass、布料、繩索彈性或傘間相對鐘擺，不能據此宣稱結構通過。</p>
+</section>
+<section id="vv-cfd" class="vv-section">
+ <h2>3／4 · 固定傘形 CFD 與雙向 FSI 準備</h2>
+ <p id="vv-solvers" class="note">正在檢查本機 PATH 中的求解器。</p>
+ <div class="vv-form">
+  <label>預計求解路線<select id="vv-solver"><option>尚未選定</option><option>LS-DYNA ICFD／ALE（版本待確認）</option><option>Fluent＋Mechanical＋System Coupling</option><option>OpenFOAM＋結構求解器＋preCICE</option></select></label>
+  <label>布料名稱／批次<input id="vv-fabric" placeholder="尚未提供"></label>
+  <label>布料厚度 m<input id="vv-thickness" type="number" min="0" step="0.00001" placeholder="需量測"></label>
+  <label>布料面密度 kg/m²<input id="vv-areal" type="number" min="0" step="0.001" placeholder="需量測"></label>
+ </div>
+ <div class="viz-controls"><button id="vv-pack" type="button">匯出 CFD／FSI 準備包 ZIP</button></div>
+ <p class="note">包含雙傘示意薄面 STL、目前設定、材料／透氣／傘繩試驗模板與分階段 V&V 流程；尚未產生可直接執行的求解器輸入檔。CFD／FSI：待求解，無壓力雲圖與結構應力結果。</p>
+ <details><summary>材料與求解前必要資料</summary><ul>
+  <li>經緯向、雙軸與剪切試驗；厚度、面密度、縫線與補強。</li>
+  <li>壓差—滲流速度及應變關係；不以通氣孔面積代替布料透氣性。</li>
+  <li>傘繩載荷—伸長、阻尼、接點與收口解除時序。</li>
+  <li>實際全開與折疊幾何、接觸、初始應力、求解器版本與授權。</li>
+ </ul></details>
+ <p class="note">求解器入口：<a href="https://ansys.synopsys.com/academic/students/ansys-ls-dyna-student" target="_blank" rel="noopener">LS-DYNA Student</a> · <a href="https://www.openfoam.com/download/openfoam-installation-on-mac-using-docker" target="_blank" rel="noopener">OpenFOAM Mac</a> · <a href="https://precice.org/adapter-openfoam-overview" target="_blank" rel="noopener">preCICE 耦合</a>。優先詢問學校研究授權與遠端工作站。</p>
+</section>
+<section id="vv-validation" class="vv-section">
+ <h2>Verification／Validation 資料比對</h2>
+ <details><summary>外部 CFD 網格敏感度</summary>
+  <label>CSV：h_m,cd（至少三層網格）<textarea id="vv-mesh" rows="5" placeholder="h_m,cd"></textarea></label>
+  <button id="vv-mesh-run" type="button">比較網格結果</button><div id="vv-mesh-result"></div>
+ </details>
+ <label>實測 CSV：time_s,force_n 或 time_s,speed_mps<input id="vv-file" type="file" accept=".csv,text/csv"></label>
+ <textarea id="vv-observations" rows="6" placeholder="time_s,force_n,speed_mps" aria-label="實測資料"></textarea>
+ <label>實測時間加上偏移量 s<input id="vv-offset" type="number" value="0" step="0.01" min="-1000" max="1000"></label>
+ <div class="viz-controls"><button id="vv-validate" type="button">與本次模擬設定比對</button></div>
+ <div id="vv-validation-result" aria-live="polite"></div><div id="vv-overlay"></div>
+ <p class="note">僅比對重疊時段，不外插、不自動對齊；必須確認力感測器量到的量與模型氣動合力是否可比較。未提供獨立實驗、不確定度與事前驗收門檻時，不顯示「驗證通過」。</p>
+</section>
+<style>
+ .vv-section{border-top:1px solid var(--border);margin-top:28px;padding-top:12px}
+ .vv-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+ .vv-section label{display:flex;flex-direction:column;gap:6px;min-width:0}
+ .vv-section input,.vv-section select,.vv-section textarea{font:inherit;padding:8px;box-sizing:border-box;width:100%;min-width:0;border:1px solid var(--border);border-radius:5px}
+ .vv-section textarea{margin:12px 0}.vv-section details{margin:15px 0}.vv-section summary{padding:8px 0}
+ .vv-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:15px 0}
+ .vv-plots{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:15px}.vv-plots>div{min-width:0}
+ .vv-chart{display:block;width:100%}.vv-table{border-collapse:collapse;width:100%;margin:12px 0}.vv-table td,.vv-table th{border-bottom:1px solid var(--border);padding:8px;text-align:left;overflow-wrap:anywhere}
+ @media(max-width:620px){.vv-plots{grid-template-columns:1fr}.vv-table{font-size:13px}}
+</style>
+<script>
+(() => {
+ const el=id=>document.getElementById(id),numeric=[...document.querySelectorAll('#vv-inputs input,#vv-advanced input')];
+ let last=null,busy=false,stale=false;
+ const fmt=(x,n=2)=>x===null||x===undefined?'未取得':Number(x).toFixed(n);
+ function cfg(){const p={};for(const input of numeric){if(!input.checkValidity()||input.value.trim()==='')throw Error('請檢查 '+input.parentElement.textContent.trim());p[input.id.slice(3)]=Number(input.value);}p.mode=el('vv-mode').value;p.retain_drogue=el('vv-retain').value==='true';return p;}
+ async function api(path,body){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!response.ok){let msg;try{msg=(await response.json()).error;}catch{msg='服務錯誤 '+response.status;}throw Error(msg);}return response;}
+ async function action(fn){if(busy)return;busy=true;el('vv-error').textContent='';const buttons=[...document.querySelectorAll('.vv-section button')];const old=buttons.map(b=>b.disabled);buttons.forEach(b=>b.disabled=true);try{await fn();}catch(e){el('vv-error').textContent=e.message;el('vv-status').textContent='本次操作未完成。';}finally{busy=false;buttons.forEach((b,i)=>b.disabled=old[i]);el('vv-export').disabled=!last;}}
+ function table(headers,rows){const t=document.createElement('table');t.className='vv-table';const head=t.createTHead().insertRow();headers.forEach(h=>{let c=document.createElement('th');c.textContent=h;head.appendChild(c);});const b=t.createTBody();rows.forEach(row=>{let r=b.insertRow();row.forEach(v=>r.insertCell().textContent=String(v));});return t;}
+ function chart(id,rows,xkey,ykey,title,units,other=null){
+  const box=el(id),W=Math.max(280,box.clientWidth),H=240,L=63,R=18,T=30,B=40;
+  if(!rows.length){box.textContent='此時段沒有資料';return;}
+  const xs=rows.map(r=>r[xkey]),ys=rows.flatMap(r=>other?[r[ykey],r[other]]:[r[ykey]]);
+  let xmin=Math.min(...xs),xmax=Math.max(...xs),ymin=Math.min(0,...ys),ymax=Math.max(...ys);
+  if(xmax===xmin)xmax=xmin+1;if(ymax===ymin)ymax=ymin+1;ymax+=(ymax-ymin)*.07;
+  const x=v=>L+(v-xmin)/(xmax-xmin)*(W-L-R),y=v=>H-B-(v-ymin)/(ymax-ymin)*(H-B-T);
+  const path=key=>rows.map((r,i)=>(i?'L':'M')+x(r[xkey]).toFixed(2)+' '+y(r[key]).toFixed(2)).join(' ');
+  let s=`<svg class="vv-chart" role="img" aria-label="${title}" viewBox="0 0 ${W} ${H}"><text x="${L}" y="18" fill="var(--foreground)" font-size="14">${title}</text>`;
+  for(let i=0;i<=3;i++){let xv=xmin+(xmax-xmin)*i/3,yv=ymin+(ymax-ymin)*i/3;s+=`<line x1="${L}" x2="${W-R}" y1="${y(yv)}" y2="${y(yv)}" stroke="var(--border)"/><text x="${L-7}" y="${y(yv)+4}" text-anchor="end" font-size="12" fill="var(--foreground)">${fmt(yv,Math.abs(ymax)<10?2:0)}</text><text x="${x(xv)}" y="${H-B+18}" text-anchor="middle" font-size="12" fill="var(--foreground)">${fmt(xv,1)}</text>`;}
+  s+=`<path d="${path(ykey)}" fill="none" stroke="var(--viz-series-1)" stroke-width="2"/>`;
+  if(other)s+=`<path d="${path(other)}" fill="none" stroke="var(--viz-series-2)" stroke-width="2" stroke-dasharray="5 3"/>`;
+  s+=`<text x="${W/2}" y="${H-3}" text-anchor="middle" fill="var(--foreground)" font-size="12">時間（s）</text><text x="4" y="20" fill="var(--foreground)" font-size="12">${units}</text></svg>`;box.innerHTML=s;
+ }
+ function plots(){if(!last)return;let rows=last.rows;const focus=el('vv-focus').value,mt=last.summary.main_trigger_s;
+  if(focus==='main')rows=mt===null?[]:rows.filter(r=>Math.abs(r.time_s-mt)<=10);if(focus==='drogue')rows=rows.filter(r=>r.time_s<=10);
+  chart('vv-force',rows,'time_s','force_n','模型氣動合力','N');chart('vv-speed',rows,'time_s','speed_mps','垂直下降速度','m/s');chart('vv-heightplot',rows,'time_s','height_m','高度 AGL','m');chart('vv-attitude',rows,'time_s','tilt_deg','單剛體傾角（1D 固定 0）','°');
+ }
+ function sync(){const g=window.parachuteGeometry;if(g){el('vv-main_area').value=(Math.PI*g.main.d*g.main.d/4).toFixed(4);el('vv-drogue_area').value=(Math.PI*g.drogue.d*g.drogue.d/4).toFixed(4);}markStale();}
+ function markStale(){if(last){stale=true;el('vv-status').textContent='參數已更改；下方曲線仍為上次結果，請重新執行。';}}
+ numeric.forEach(n=>n.addEventListener('input',markStale));for(const id of ['vv-mode','vv-retain'])el(id).addEventListener('change',markStale);
+ el('vv-sync').onclick=sync;
+ el('vv-run').onclick=()=>action(async()=>{const p=cfg();el('vv-status').textContent='Python 正在積分下降歷程…';last=await (await api('/api/simulate',p)).json();stale=false;const s=last.summary;
+  el('vv-status').textContent=(s.landed?'模擬到達地面。':'已到設定時間上限，尚未落地。')+' 物理模型：未標定。';el('vv-summary').replaceChildren(table(['量','本次結果'],[['垂直落地速度',fmt(s.landing_speed_mps)+' m/s'],['對地合速度',fmt(s.ground_speed_mps)+' m/s'],['模型氣動力峰值',fmt(s.aero_peak_n,1)+' N'],['主傘氣動力峰值',fmt(s.main_aero_peak_n,1)+' N'],['最高點起算時間',fmt(s.duration_s)+' s'],['水平漂移',fmt(s.drift_m)+' m']]));plots();
+ });
+ el('vv-converge').onclick=()=>action(async()=>{el('vv-status').textContent='正在執行三組時間步長…';const r=await(await api('/api/convergence',cfg())).json();el('vv-conv').replaceChildren(table(['Δt (s)','氣動峰值 (N)','落地速度 (m/s)','漂移 (m)'],r.levels.map(x=>[fmt(x.dt_s,4),fmt(x.aero_peak_n,2),fmt(x.landing_speed_mps),fmt(x.drift_m)])));const p=document.createElement('p');p.textContent='最後兩層相對差：峰值 '+fmt(r.fine_relative_change_percent.aero_peak_n,3)+'%；落地速度 '+fmt(r.fine_relative_change_percent.landing_speed_mps,3)+'%。'+r.note;el('vv-conv').appendChild(p);el('vv-conv-details').open=true;el('vv-status').textContent='時間步長敏感度檢查完成；尚不等於實驗驗證。';});
+ function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+ el('vv-export').onclick=()=>{if(!last)return;const keys=Object.keys(last.rows[0]);const csv=keys.join(',')+'\n'+last.rows.map(r=>keys.map(k=>r[k]).join(',')).join('\n');download(new Blob([csv],{type:'text/csv;charset=utf-8'}),'parachute-'+last.config.mode+'-history.csv');download(new Blob([JSON.stringify({config:last.config,summary:last.summary,limitations:last.limitations},null,2)],{type:'application/json'}),'parachute-run-metadata.json');};
+ el('vv-pack').onclick=()=>action(async()=>{const geometry=window.parachuteGeometry||{main:{v:140},drogue:{v:80}};const response=await api('/api/project',{config:cfg(),main_vent_m:geometry.main.v/1000,drogue_vent_m:geometry.drogue.v/1000,materials:{solver:el('vv-solver').value,fabric:el('vv-fabric').value,thickness_m:el('vv-thickness').value||null,areal_mass_kg_m2:el('vv-areal').value||null}});download(await response.blob(),'parachute-cfd-fsi-preparation.zip');el('vv-status').textContent='準備包已匯出；未執行 CFD／FSI。';});
+ el('vv-mesh-run').onclick=()=>action(async()=>{const r=await(await api('/api/mesh-study',{csv:el('vv-mesh').value})).json();el('vv-mesh-result').replaceChildren(table(['h (m)','Cd','與前層相對差 %'],r.levels.map(x=>[x.h_m,x.cd,fmt(x.relative_change_percent,3)])));const p=document.createElement('p');p.textContent=r.note;el('vv-mesh-result').appendChild(p);});
+ el('vv-file').onchange=async()=>{const f=el('vv-file').files[0];if(f){if(f.size>500000){el('vv-error').textContent='CSV 不可超過 500 KB';return;}el('vv-observations').value=await f.text();}};
+ el('vv-validate').onclick=()=>action(async()=>{if(!last)throw Error('請先執行動態模擬');if(stale)throw Error('參數已變更，請先重新執行動態模擬');const r=await(await api('/api/validate',{config:last.config,csv:el('vv-observations').value,time_offset:el('vv-offset').value})).json();el('vv-validation-result').replaceChildren(table(['物理量','RMSE','平均偏差','MAE'],Object.entries(r.metrics).map(([k,m])=>[k,fmt(m.rmse,3),fmt(m.bias,3),fmt(m.mae,3)])));const p=document.createElement('p');p.textContent='比對 '+r.matched_count+' 筆，排除 '+r.excluded_count+' 筆。'+r.note;el('vv-validation-result').appendChild(p);const k=Object.keys(r.metrics)[0];chart('vv-overlay',r.aligned,'time_s',k,'實測實線／模擬虛線',k==='force_n'?'N':'m/s','sim_'+k);});
+ el('vv-focus').onchange=plots;window.addEventListener('resize',plots);
+ fetch('/api/solvers').then(r=>r.json()).then(r=>{const found=Object.entries(r).filter(([k,v])=>v).map(([k])=>k);el('vv-solvers').textContent=found.length?'PATH 偵測到：'+found.join('、')+'；尚未確認版本、授權或 FSI 能力。':'PATH 中未偵測到求解器；CFD／FSI 狀態：待外部求解。';}).catch(()=>el('vv-solvers').textContent='無法檢查求解器，請確認 Python 服務。');
+})();
+</script>

@@ -1,0 +1,53 @@
+{
+  "levels": [
+    {
+      "dt_s": 0.04,
+      "landed": true,
+      "duration_s": 244.97102326272474,
+      "landing_speed_mps": 8.026888635328262,
+      "ground_speed_mps": 8.026888635328262,
+      "aero_peak_n": 411.74921954642474,
+      "peak_time_s": 191.07497885942087,
+      "main_aero_peak_n": 411.74921954642474,
+      "drogue_aero_peak_n": 191.2167826451302,
+      "main_trigger_s": 190.394978859421,
+      "drift_m": 0.0,
+      "max_tilt_deg": 0.0
+    },
+    {
+      "dt_s": 0.02,
+      "landed": true,
+      "duration_s": 244.97102301513186,
+      "landing_speed_mps": 8.02688863532902,
+      "ground_speed_mps": 8.02688863532902,
+      "aero_peak_n": 411.8323414669293,
+      "peak_time_s": 191.09497885974656,
+      "main_aero_peak_n": 411.8323414669293,
+      "drogue_aero_peak_n": 191.21678278067188,
+      "main_trigger_s": 190.3949788597462,
+      "drift_m": 0.0,
+      "max_tilt_deg": 0.0
+    },
+    {
+      "dt_s": 0.01,
+      "landed": true,
+      "duration_s": 244.9710229999539,
+      "landing_speed_mps": 8.026888635329065,
+      "ground_speed_mps": 8.026888635329065,
+      "aero_peak_n": 411.9376138553159,
+      "peak_time_s": 191.0849788595448,
+      "main_aero_peak_n": 411.9376138553159,
+      "drogue_aero_peak_n": 191.21678278068453,
+      "main_trigger_s": 190.39497885954543,
+      "drift_m": 0.0,
+      "max_tilt_deg": 0.0
+    }
+  ],
+  "fine_relative_change_percent": {
+    "aero_peak_n": 0.025555420249525885,
+    "landing_speed_mps": 5.753820679799818e-13,
+    "duration_s": 6.195818605857403e-09,
+    "drift_m": 0.0
+  },
+  "note": "時間步長敏感度，不代表物理模型已驗證；峰值在每步取樣，三次均須落地才能比較落地速度。"
+}

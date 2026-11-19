@@ -1,0 +1,124 @@
+<div id="parachute-three">
+  <div class="viz-controls">
+    <label class="form-label">模型視角
+      <select class="form-select" id="pc-view"><option value="compare">雙傘同尺度比較</option><option value="main">主傘＋火箭</option><option value="drogue">導引傘＋火箭</option></select>
+    </label>
+    <button type="button" class="btn" id="pc-front">正視</button>
+    <button type="button" class="btn" id="pc-top">俯視</button>
+    <button type="button" class="btn" id="pc-iso">立體</button>
+    <label class="form-check"><input class="form-check-input" type="checkbox" id="pc-wire"><span class="form-check-label">網格</span></label>
+  </div>
+  <div class="viz-row"><span id="pc-spec">主傘 D₀ 2.78 m／12 繩　導引傘 D₀ 1.64 m／8 繩</span></div>
+  <canvas id="pc-canvas" role="img" aria-label="可拖曳旋轉的圓形主傘與導引傘三維模型，包含中央通氣孔、傘繩及連接環">圓形主傘與導引傘三維幾何模型</canvas>
+  <div class="viz-controls">
+    <button type="button" class="btn btn-primary" id="pc-play">播放展開示意</button>
+    <label class="form-label">幾何展開 <span id="pc-value" class="tabular-nums">100%</span><input id="pc-open" class="form-range" type="range" min="0" max="100" value="100"></label>
+    <label class="form-label">縮放<input id="pc-zoom" class="form-range" type="range" min="70" max="160" value="100"></label>
+  </div>
+  <div class="text-small" id="pc-status" aria-live="polite">幾何示意 · 拖曳旋轉／滾輪縮放 · 不含充氣流場與衝擊求解</div>
+</div>
+<style>
+  #parachute-three {color:var(--foreground)}
+  #parachute-three canvas {width:100%;height:480px;display:block;touch-action:none}
+  #parachute-three .viz-row {margin-top:12px}
+  @media(max-width:450px){#parachute-three canvas{height:410px}}
+</style>
+<script>
+(() => {
+// GEOMETRY_START
+const specs={main:{name:'主傘',area:6.05,n:12,L:3.45,vent:.14,series:1},drogue:{name:'導引傘',area:2.12,n:8,L:2.05,vent:.08,series:2}};
+function createGeometry(mode,opening){
+  const faces=[],lines=[],labels=[];
+  function line(a,b,kind='rigging',group=''){lines.push({a,b,kind,group});}
+  function face(points,series,group){faces.push({points,series,group});}
+  function chute(key,cx,cy){
+    const s=specs[key],R=Math.sqrt(s.area/Math.PI),f=.07+.93*opening;
+    // Spherical-cap illustration: radial meridian uses the flat nominal radius.
+    // Circumferential fabric deformation and transient filling are not solved.
+    const theta=1.1,S=R/theta,rv=s.vent/2;
+    const p=(u,a)=>{const t=rv/R+(1-rv/R)*u;return [cx+f*S*Math.sin(theta*t)*Math.cos(a),cy+S*(Math.cos(theta*t)-Math.cos(theta)),f*S*Math.sin(theta*t)*Math.sin(a)];};
+    const nr=14,na=s.n*6;
+    for(let j=0;j<nr;j++)for(let i=0;i<na;i++){
+      const a=i*2*Math.PI/na,b=(i+1)*2*Math.PI/na;
+      const p0=p(j/nr,a),p1=p(j/nr,b),p2=p((j+1)/nr,b),p3=p((j+1)/nr,a);
+      face([p0,p1,p2],s.series,key+'_canopy');face([p0,p2,p3],s.series,key+'_canopy');
+    }
+    for(let i=0;i<na;i++){let a=i*2*Math.PI/na,b=(i+1)*2*Math.PI/na;line(p(0,a),p(0,b),'rim',key);line(p(1,a),p(1,b),'rim',key);}
+    const skirt=f*S*Math.sin(theta),ring=[cx,cy-Math.sqrt(s.L*s.L-skirt*skirt),0];
+    for(let i=0;i<s.n;i++){
+      const a=i*2*Math.PI/s.n;
+      for(let j=0;j<nr;j++)line(p(j/nr,a),p((j+1)/nr,a),'seam',key);
+      line(p(1,a),ring,'rigging',key+'_lines');
+    }
+    for(let i=0;i<24;i++)line([ring[0]+.045*Math.cos(i*Math.PI/12),ring[1]+.045*Math.sin(i*Math.PI/12),0],[ring[0]+.045*Math.cos((i+1)*Math.PI/12),ring[1]+.045*Math.sin((i+1)*Math.PI/12),0],'rim',key+'_ring');
+    labels.push({p:[cx,cy+S*(1-Math.cos(theta))+.25,0],text:s.name+' · D₀ '+(R*2).toFixed(2)+' m'});
+    return ring;
+  }
+  function rocket(ring){
+    const top=ring[1]-.65,base=top-3.098,r=.076,cx=ring[0],N=24;
+    line(ring,[cx,top,0],'rigging','riser');
+    for(let i=0;i<N;i++){
+      const a=2*Math.PI*i/N,b=2*Math.PI*(i+1)/N;
+      const p=[cx+r*Math.cos(a),base,r*Math.sin(a)],q=[cx+r*Math.cos(b),base,r*Math.sin(b)],u=[q[0],top-.35,q[2]],v=[p[0],top-.35,p[2]];
+      face([p,q,u],0,'rocket');face([p,u,v],0,'rocket');face([v,u,[cx,top,0]],0,'rocket');
+      face([[cx,base,0],q,p],0,'rocket');
+    }
+    for(let i=0;i<4;i++){
+      const a=i*Math.PI/2;face([[cx+r*Math.cos(a),base+.55,r*Math.sin(a)],[cx+(r+.15)*Math.cos(a),base+.08,(r+.15)*Math.sin(a)],[cx+r*Math.cos(a),base,r*Math.sin(a)]],0,'illustrative_fins');
+    }
+    labels.push({p:[cx+.45,base+1.3,0],text:'箭長 3.098 m'});
+    labels.push({p:[cx+.35,ring[1]+.2,0],text:'匯集環／吊帶'});
+  }
+  if(mode==='compare'){chute('main',-1.55,0);chute('drogue',1.3,0);}
+  else rocket(chute(mode,0,0));
+  return {faces,lines,labels};
+}
+// GEOMETRY_END
+const root=document.getElementById('parachute-three'),get=id=>root.querySelector('#'+id),canvas=get('pc-canvas'),ctx=canvas.getContext('2d');
+let state={mode:'compare',opening:1,yaw:-.45,pitch:.18,zoom:1,wire:false},playing=false,start=0,raf=0,drag=null;
+function restore(saved){const s=saved?.privateContent;if(s&&['main','drogue','compare'].includes(s.mode)){state={...state,...s};state.opening=Math.max(0,Math.min(1,Number(state.opening)||0));sync();}}
+function save(){window.openai?.setWidgetState?.({modelContent:{view:state.mode,mainArea:6.05,drogueArea:2.12,modelType:'geometric illustration, not opening-load simulation'},privateContent:state})?.catch(()=>{});}
+function sync(){get('pc-view').value=state.mode;get('pc-open').value=state.opening*100;get('pc-value').textContent=Math.round(state.opening*100)+'%';get('pc-wire').checked=state.wire;get('pc-zoom').value=state.zoom*100;get('pc-spec').textContent=state.mode==='compare'?'主傘 D₀ 2.78 m／12 繩　導引傘 D₀ 1.64 m／8 繩':state.mode==='main'?'主傘 6.05 m² · 傘繩 3.45 m × 12 · 中央孔名目 140 mm':'導引傘 2.12 m² · 傘繩 2.05 m × 8 · 中央孔名目 80 mm';}
+function color(token){const el=document.createElement('span');el.style.color='var('+token+')';root.appendChild(el);const c=getComputedStyle(el).color;el.remove();return c;}
+function draw(){
+ const w=canvas.clientWidth,h=canvas.clientHeight,dpr=Math.min(devicePixelRatio||1,2);canvas.width=w*dpr;canvas.height=h*dpr;ctx.scale(dpr,dpr);
+ const fg=color('--foreground'),border=color('--border'),c1=color('--viz-series-1'),c2=color('--viz-series-2');
+ const geom=createGeometry(state.mode,state.opening),center=state.mode==='compare'?-1.35:state.mode==='main'?-3.05:-2.4;
+ const scale=Math.min(w/(state.mode==='compare'?5.7:4.8),h/(state.mode==='compare'?5.1:state.mode==='main'?8.9:7.5))*state.zoom;
+ const ca=Math.cos(state.yaw),sa=Math.sin(state.yaw),cp=Math.cos(state.pitch),sp=Math.sin(state.pitch);
+ function project(p){const x=ca*p[0]+sa*p[2],z=-sa*p[0]+ca*p[2],y=p[1]-center;return [w/2+scale*x,h/2-scale*(cp*y-sp*z),sp*y+cp*z];}
+ const items=[];
+ for(const f of geom.faces){const pts=f.points.map(project);items.push({type:'face',f,pts,z:pts.reduce((s,p)=>s+p[2],0)/3});}
+ for(const l of geom.lines){const pts=[project(l.a),project(l.b)];items.push({type:'line',l,pts,z:(pts[0][2]+pts[1][2])/2+.001});}
+ items.sort((a,b)=>a.z-b.z);
+ for(const it of items){ctx.beginPath();it.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));
+   if(it.type==='face'){
+     ctx.closePath();ctx.fillStyle=it.f.series===1?c1:it.f.series===2?c2:border;ctx.globalAlpha=state.wire?.16:.9;ctx.fill();
+     if(state.wire){ctx.strokeStyle=fg;ctx.globalAlpha=.16;ctx.lineWidth=.5;ctx.stroke();}
+   }else{ctx.strokeStyle=fg;ctx.globalAlpha=it.l.kind==='seam'?.35:.8;ctx.lineWidth=it.l.kind==='rim'?1.4:.85;ctx.stroke();}
+ }
+ ctx.globalAlpha=1;ctx.fillStyle=fg;ctx.font=getComputedStyle(root).font;ctx.textAlign='center';
+ for(const l of geom.labels){const p=project(l.p);ctx.fillText(l.text,Math.max(90,Math.min(w-90,p[0])),Math.max(22,Math.min(h-15,p[1])));}
+ ctx.textAlign='left';ctx.strokeStyle=fg;ctx.lineWidth=1;const bx=20,by=h-27;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx+scale,by);ctx.stroke();ctx.fillText('1 m',bx,by-8);
+}
+function stop(){playing=false;cancelAnimationFrame(raf);get('pc-play').textContent='播放展開示意';}
+get('pc-view').onchange=e=>{stop();state.mode=e.target.value;state.zoom=1;sync();draw();save();};
+get('pc-wire').onchange=e=>{state.wire=e.target.checked;draw();save();};
+get('pc-open').oninput=e=>{stop();state.opening=+e.target.value/100;sync();draw();};get('pc-open').onchange=save;
+get('pc-zoom').oninput=e=>{state.zoom=+e.target.value/100;draw();};get('pc-zoom').onchange=save;
+for(const [id,yaw,pitch] of [['pc-front',0,0],['pc-top',0,1.48],['pc-iso',-.45,.3]])get(id).onclick=()=>{state.yaw=yaw;state.pitch=pitch;draw();save();};
+get('pc-play').onclick=()=>{
+ if(playing){stop();save();return;}
+ if(matchMedia('(prefers-reduced-motion: reduce)').matches){state.opening=1;sync();draw();get('pc-status').textContent='已顯示展開狀態 · 減少動態效果已啟用';save();return;}
+ playing=true;start=performance.now();get('pc-play').textContent='暫停';
+ const tick=t=>{state.opening=Math.min(1,(t-start)/4000);sync();draw();if(state.opening<1)raf=requestAnimationFrame(tick);else{stop();save();}};raf=requestAnimationFrame(tick);
+};
+canvas.onpointerdown=e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};
+canvas.onpointermove=e=>{if(!drag)return;state.yaw+=(e.clientX-drag[0])*.009;state.pitch=Math.max(-1.48,Math.min(1.48,state.pitch+(e.clientY-drag[1])*.008));drag=[e.clientX,e.clientY];draw();};
+canvas.onpointerup=()=>{drag=null;save();};canvas.onpointercancel=()=>{drag=null;};
+canvas.addEventListener('wheel',e=>{e.preventDefault();state.zoom=Math.max(.7,Math.min(1.6,state.zoom-e.deltaY*.001));sync();draw();save();},{passive:false});
+restore(window.openai?.widgetState);sync();new ResizeObserver(draw).observe(canvas);
+window.addEventListener('openai:set_globals',e=>{restore(e.detail?.globals?.widgetState);draw();});
+new MutationObserver(()=>draw()).observe(document.documentElement,{attributes:true,attributeFilter:['class','style','data-theme']});draw();
+})();
+</script>

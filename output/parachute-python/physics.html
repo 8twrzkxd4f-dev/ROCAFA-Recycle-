@@ -1,0 +1,55 @@
+<section id="pw-physics">
+  <h2>氣動力與終端速度估算</h2>
+  <div class="pw-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+    <label class="form-label">回收質量（kg）<input class="form-control" id="ph-mass" type="number" min="0.01" max="1000" step="0.001" value="19.471"></label>
+    <label class="form-label">阻力係數 Cd<input class="form-control" id="ph-cd" type="number" min="0.05" max="5" step="0.01" value="0.80"></label>
+    <label class="form-label">開傘高度空氣密度（kg/m³）<input class="form-control" id="ph-rho_open" type="number" min="0.05" max="2" step="0.001" value="1.173"></label>
+    <label class="form-label">近地空氣密度（kg/m³）<input class="form-control" id="ph-rho_land" type="number" min="0.05" max="2" step="0.001" value="1.225"></label>
+    <label class="form-label">傘完全展開時速度（m/s）<input class="form-control" id="ph-speed" type="number" min="0" max="200" step="0.01" value="14.32"></label>
+    <label class="form-label">完全展開高度（m AGL）<input class="form-control" id="ph-height" type="number" min="0" max="10000" step="1" value="450"></label>
+    <label class="form-label">比較用速度上限（m/s）<input class="form-control" id="ph-target" type="number" min="0.01" max="100" step="0.1" value="8.0"></label>
+  </div>
+  <div id="ph-error" class="text-destructive" role="alert"></div>
+  <div class="pw-physics-results" aria-live="polite">
+    <div><span class="text-muted">開傘高度動壓</span><br><strong id="ph-q">—</strong></div>
+    <div><span class="text-muted">全開穩態阻力</span><br><strong id="ph-force">—</strong></div>
+    <div><span class="text-muted">全開假設下淨減速度</span><br><strong id="ph-accel">—</strong></div>
+    <div><span class="text-muted">近地終端速度</span><br><strong id="ph-vt">—</strong></div>
+    <div><span class="text-muted">理想落地速度</span><br><strong id="ph-vland">—</strong></div>
+    <div><span class="text-muted">與比較上限</span><br><strong id="ph-result">—</strong></div>
+  </div>
+  <p class="note" id="ph-context"></p>
+  <p class="note">阻力以名目平面面積計算，Cd 必須與該面積定義相同；此值未經實測。落地估算假設傘在設定高度瞬間完全充氣、近地密度全程固定、只有所選傘承受阻力；忽略風、火箭阻力及另一頂傘。此模型不計開傘瞬態峰值、傘布變形或連接件受力。</p>
+</section>
+<script>
+(() => {
+ const id=s=>document.getElementById(s),fields=['mass','cd','rho_open','rho_land','speed','height','target'];
+ let request=0,timer;
+ const settings={main:{cd:.8,speed:14.32,height:450,target:8},drogue:{cd:.75,speed:0,height:3361,target:15}};
+ function validShape(){let p={d:+id('pw-d').value,n:+id('pw-n').value,v:+id('pw-v').value,l:+id('pw-l').value};
+   if(!Number.isFinite(p.d)||p.d<.5||p.d>6||!Number.isInteger(p.n)||p.n<4||p.n>32||p.v<0||p.v/1000>=p.d||p.l<0.2||p.l>10)return null;return p;}
+ async function update(){
+   const p=validShape(),type=id('pw-type').value; const err=id('ph-error');
+   if(!p){err.textContent='請輸入有效的傘面與傘繩數值。';return;}
+   if(!window.updateParachute3D(type,p)){err.textContent='傘繩長度小於示意傘冠半徑，無法顯示 3D 外型；請加長傘繩。';return;}
+   const query=new URLSearchParams();query.set('diameter',p.d);
+   for(const key of fields){const raw=id('ph-'+key).value;if(raw.trim()===''){err.textContent='請填寫全部氣動參數。';return;}query.set(key,raw);}
+   const my=++request;
+   try{
+     const response=await fetch('/api/calculate?'+query.toString());const data=await response.json();if(my!==request)return;
+     if(!response.ok){err.textContent=data.error;return;}err.textContent='';
+     const f=(n,d=2)=>Number(n).toFixed(d);
+     id('ph-q').textContent=f(data.dynamic_pressure_pa,1)+' Pa';id('ph-force').textContent=f(data.drag_n,1)+' N';
+     id('ph-accel').textContent=f(data.net_deceleration_g,2)+' g（正值為減速）';
+     id('ph-vt').textContent=f(data.terminal_mps)+' m/s';id('ph-vland').textContent=f(data.ideal_landing_mps)+' m/s';
+     id('ph-result').textContent=(data.meets_target_estimate?'估算低於或等於':'估算高於')+' '+f(data.target_mps)+' m/s';
+     id('ph-context').textContent=type==='main'?'目前計算主傘單獨承載；比較上限為使用者設定，非競賽規範。':'目前計算導引傘單獨承載到地面，未模擬 450 m 開啟主傘；此速度不代表雙傘任務實際落地速度。';
+   }catch(e){if(my===request)err.textContent='無法連接本機 Python 計算服務。';}
+ }
+ function schedule(){clearTimeout(timer);request++;for(const name of ['q','force','accel','vt','vland','result'])id('ph-'+name).textContent='待更新';timer=setTimeout(update,100);}
+ id('pw-type').addEventListener('change',()=>{const preset=settings[id('pw-type').value];for(const [k,v] of Object.entries(preset))id('ph-'+k).value=v;schedule();});
+ for(const k of ['d','n','v','l'])id('pw-'+k).addEventListener('input',schedule);
+ for(const k of fields)id('ph-'+k).addEventListener('input',schedule);
+ schedule();
+})();
+</script>

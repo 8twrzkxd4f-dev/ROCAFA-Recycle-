@@ -1,0 +1,78 @@
+<div id="parachute-workshop">
+  <div class="viz-controls">
+    <label class="form-label">選擇傘型
+      <select id="pw-type" class="form-select"><option value="main">主傘</option><option value="drogue">導引傘</option></select>
+    </label>
+  </div>
+  <div class="pw-fields">
+    <label class="form-label">平面名目直徑 D₀（m）<input id="pw-d" class="form-control" type="number" min="0.5" max="6" step="0.001" inputmode="decimal"></label>
+    <label class="form-label">傘片數（片）<input id="pw-n" class="form-control" type="number" min="4" max="32" step="1" inputmode="numeric"></label>
+    <label class="form-label">中央孔直徑（mm）<input id="pw-v" class="form-control" type="number" min="0" max="400" step="1" inputmode="numeric"></label>
+    <label class="form-label">單側縫份（mm）<input id="pw-s" class="form-control" type="number" min="0" max="30" step="1" inputmode="numeric"></label>
+    <label class="form-label">每條傘繩有效長度（m）<input id="pw-l" class="form-control" type="number" min="0.2" max="10" step="0.01" inputmode="decimal"></label>
+  </div>
+  <div id="pw-error" role="alert" class="text-destructive"></div>
+  <div class="pw-visuals">
+    <div><div>傘面平面圖</div><svg id="pw-circle" role="img" aria-label="圓形傘面平面圖" viewBox="0 0 320 250"></svg></div>
+    <div><div>單片裁片示意</div><svg id="pw-panel" role="img" aria-label="單片傘片示意，含縫份及縫線" viewBox="0 0 320 250"></svg></div>
+  </div>
+  <div class="viz-row text-small"><span>實線：縫線／成品輪廓　粗淡線：縫份示意</span></div>
+  <div class="pw-results" aria-live="polite">
+    <div><span class="text-muted">名目參考面積</span><br><span id="pw-area" class="tabular-nums"></span></div>
+    <div><span class="text-muted">扣孔後傘布面積</span><br><span id="pw-net" class="tabular-nums"></span></div>
+    <div><span class="text-muted">單片角度</span><br><span id="pw-angle" class="tabular-nums"></span></div>
+    <div><span class="text-muted">單片外緣弧長</span><br><span id="pw-arc" class="tabular-nums"></span></div>
+    <div><span class="text-muted">縫線徑向長度</span><br><span id="pw-radial" class="tabular-nums"></span></div>
+    <div><span class="text-muted">傘繩有效總長</span><br><span id="pw-lines" class="tabular-nums"></span></div>
+  </div>
+  <div id="pw-extra" class="text-small"></div>
+</div>
+<style>
+ #parachute-workshop {color:var(--foreground)}
+ #parachute-workshop .pw-fields {display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+ #parachute-workshop .pw-fields label {min-width:0}
+ #parachute-workshop .pw-fields input {width:100%;box-sizing:border-box}
+ #parachute-workshop .pw-visuals {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+ #parachute-workshop svg {width:100%;height:auto;display:block;overflow:visible}
+ #parachute-workshop .pw-results {display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+ #parachute-workshop #pw-extra {margin-top:8px}
+ @media(max-width:480px){#parachute-workshop .pw-visuals{grid-template-columns:1fr}#parachute-workshop .pw-results{grid-template-columns:repeat(2,1fr)}}
+</style>
+<script>
+(() => {
+ const root=document.getElementById('parachute-workshop'),get=id=>root.querySelector('#pw-'+id);
+ const defaults={main:{d:2*Math.sqrt(6.05/Math.PI),n:12,v:140,s:15,l:3.45},drogue:{d:2*Math.sqrt(2.12/Math.PI),n:8,v:80,s:15,l:2.05}};
+ let state={type:'main',main:{...defaults.main},drogue:{...defaults.drogue}};
+ const fields=['d','n','v','s','l'];
+ const valid=q=>Number.isFinite(q.d)&&q.d>=.5&&q.d<=6&&Number.isInteger(q.n)&&q.n>=4&&q.n<=32&&Number.isFinite(q.v)&&q.v>=0&&q.v<=400&&q.v<q.d*1000&&Number.isFinite(q.s)&&q.s>=0&&q.s<=30&&Number.isFinite(q.l)&&q.l>=.2&&q.l<=10;
+ const fmt=(x,n=2)=>Number(x).toFixed(n);
+ function save(){if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:state,privateContent:null}).catch(()=>{});}
+ function load(saved){const s=saved?.modelContent;if(s&&['main','drogue'].includes(s.type)&&valid(s.main||{})&&valid(s.drogue||{}))state={type:s.type,main:{...s.main},drogue:{...s.drogue}};sync();render();}
+ function sync(){get('type').value=state.type;const q=state[state.type];fields.forEach(k=>get(k).value=k==='d'?fmt(q.d,3):q[k]);}
+ function pathArc(cx,cy,r,a){const x=cx+r*Math.sin(a),y=cy-r*Math.cos(a);return [x,y];}
+ function render(){
+   window.parachuteGeometry={main:{...state.main},drogue:{...state.drogue}};
+   const q=state[state.type],R=q.d/2,r=q.v/2000,th=2*Math.PI/q.n,net=Math.PI*(R*R-r*r),nominal=Math.PI*R*R,radial=R-r,arc=R*th;
+   get('error').textContent='';
+   get('area').textContent=fmt(nominal,2)+' m²';get('net').textContent=fmt(net,2)+' m²';get('angle').textContent=fmt(360/q.n,1)+'°';get('arc').textContent=fmt(arc*1000,0)+' mm';get('radial').textContent=fmt(radial*1000,0)+' mm';get('lines').textContent=q.n+' 條 × '+fmt(q.l,2)+' m = '+fmt(q.n*q.l,2)+' m';
+   const perPiece=net/q.n, perimeter=2*(R-r)+th*(R+r),sa=q.s/1000;
+   // Conservative rounded-offset upper bound; no nesting, grain, reinforcements or wastage.
+   const bound=net+q.n*(perimeter*sa+Math.PI*sa*sa);
+   get('extra').textContent='單片淨面積 '+fmt(perPiece,3)+' m²；含縫份布料面積概估上界 '+fmt(bound,2)+' m²（未含排料損耗與補強），傘繩總長未含打結或縫接。';
+   const cx=160,cy=125,scale=100/R,orr=100,irr=r*scale;
+   const circle=get('circle');let s=`<circle cx="${cx}" cy="${cy}" r="${orr}" fill="var(--viz-series-1)" fill-opacity="0.16" stroke="var(--foreground)"/>`;
+   for(let i=0;i<q.n;i++){const a=i*th;let p=pathArc(cx,cy,irr,a),e=pathArc(cx,cy,orr,a);s+=`<line x1="${p[0]}" y1="${p[1]}" x2="${e[0]}" y2="${e[1]}" stroke="var(--foreground)" stroke-opacity="0.55"/>`;}
+   if(irr>0)s+=`<circle cx="${cx}" cy="${cy}" r="${irr}" fill="var(--background)" stroke="var(--foreground)"/>`;
+   circle.innerHTML=s;
+   const pcx=160,pcy=225,pr=190,pi=pr*r/R,a=-th/2,b=th/2,p1=pathArc(pcx,pcy,pr,a),p2=pathArc(pcx,pcy,pr,b),p3=pathArc(pcx,pcy,pi,b),p4=pathArc(pcx,pcy,pi,a);
+   let d=`M ${p4[0]} ${p4[1]} L ${p1[0]} ${p1[1]} A ${pr} ${pr} 0 0 1 ${p2[0]} ${p2[1]} L ${p3[0]} ${p3[1]}`;
+   d+=pi>0?` A ${pi} ${pi} 0 0 0 ${p4[0]} ${p4[1]} Z`:' Z';
+   const stroke=2*sa*pr/R;
+   get('panel').innerHTML=`<path d="${d}" fill="var(--viz-series-1)" fill-opacity="0.18" stroke="var(--viz-series-1)" stroke-opacity="0.24" stroke-width="${stroke}" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="var(--foreground)" stroke-width="1.5"/>`;
+ }
+ get('type').addEventListener('change',()=>{state.type=get('type').value;sync();render();save();});
+ fields.forEach(k=>get(k).addEventListener('input',()=>{const q={...state[state.type]};for(const key of fields){const el=get(key);q[key]=el.value.trim()===''?NaN:Number(el.value);}if(!valid(q)){get('error').textContent='請檢查輸入範圍：直徑 0.5–6 m、傘片 4–32 片、中央孔小於傘徑、縫份 0–30 mm、傘繩 0.2–10 m。';return;}state[state.type]=q;render();save();}));
+ load(window.openai?.widgetState);
+ window.addEventListener('openai:set_globals',e=>load(e.detail?.globals?.widgetState));
+})();
+</script>
